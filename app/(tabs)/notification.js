@@ -244,34 +244,7 @@ function NotificationScreen({ navigation }) {
           </Text>
         </View>} />
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('home')}
-        >
-          <Icon name="home-outline" size={30} color="#9CA3AF" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('add')}
-        >
-          <Icon name="add-circle-outline" size={30} color="#9CA3AF" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-       style={styles.navButton}
-       onPress={() => router.push('notification')}
-       >
-        <Icon name="notifications-outline" size={30} color="#0b6f7c" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navButton}
-          onPress={() => router.push('history')}
-        >
-          <Icon name="time-outline" size={30} color="#9CA3AF" />
-        </TouchableOpacity>
-      </View>
+      
     </View>
   );
 }
