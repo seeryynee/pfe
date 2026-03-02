@@ -27,7 +27,7 @@ export default function LoginScreen() {
       if (error) {
         alert(error.message);
       } else {
-        router.push('notification');
+        router.push('home');
       }
     } catch (err) {
       alert(err.message);

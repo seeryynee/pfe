@@ -141,7 +141,6 @@ function NotificationScreen({ navigation }) {
       date.getFullYear() === today.getFullYear()
     );
   };
-
   const todayNotification = notification.filter((notif) => isToday(notif.created_at));
   const oldNotification = notification.filter((notif) => !isToday(notif.created_at));
   const displayedNotification = activeTab === 'today' ? todayNotification : oldNotification;
@@ -252,7 +251,6 @@ function NotificationScreen({ navigation }) {
         >
           <Icon name="home-outline" size={30} color="#9CA3AF" />
         </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => router.push('add')}
