@@ -83,7 +83,7 @@ export default function AddMedicationScreen() {
       const hours = selectedTime.getHours().toString().padStart(2, '0');
       const minutes = selectedTime.getMinutes().toString().padStart(2, '0');
       const updated = [...takes];
-      updated[currentTakeIndex].time =` ${hours}:${minutes}`;
+      updated[currentTakeIndex].time =`${hours}:${minutes}`;
       setTakes(updated);
     }
   };

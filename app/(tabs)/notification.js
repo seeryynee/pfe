@@ -16,26 +16,26 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { supabase } from '../lib/supabase';
 
 function NotificationScreen({ navigation }) {
-  const [notifications, setNotifications] = useState([]);
+  const [notification, setNotification] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('today');
   const router = useRouter();
 
   useEffect(() => {
-    fetchNotifications();
+    fetchNotification();
 
     const subscription = supabase
-      .channel('notifications-channel')
+      .channel('notification-channel')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'notifications',
+          table: 'notification',
         },
         (payload) => {
           console.log('Changement détecté:', payload);
-          fetchNotifications();
+          fetchNotification();
         }
       )
       .subscribe();
@@ -45,36 +45,36 @@ function NotificationScreen({ navigation }) {
     };
   }, []);
 
-  const fetchNotifications = async () => {
+  const fetchNotification = async () => {
     try {
       const { data, error } = await supabase
-        .from('notifications')
+        .from('notification')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setNotifications(data || []);
+      setNotification(data || []);
     } catch (error) {
       console.error('Erreur:', error);
-      Alert.alert('Erreur', 'Impossible de charger les notifications');
+      Alert.alert('Erreur', 'Impossible de charger les notification');
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchNotifications();
+    await fetchNotification();
     setRefreshing(false);
   };
 
   const markAsRead = async (id) => {
     try {
       const { error } = await supabase
-        .from('notifications')
+        .from('notification')
         .update({ is_read: true })
         .eq('id', id);
 
       if (error) throw error;
-      await fetchNotifications();
+      await fetchNotification();
     } catch (error) {
       console.error('Erreur:', error);
     }
@@ -92,12 +92,12 @@ function NotificationScreen({ navigation }) {
           onPress: async () => {
             try {
               const { error } = await supabase
-                .from('notifications')
+                .from('notification')
                 .delete()
                 .eq('id', id);
 
               if (error) throw error;
-              await fetchNotifications();
+              await fetchNotification();
             } catch (error) {
               console.error('Erreur:', error);
             }
@@ -142,9 +142,9 @@ function NotificationScreen({ navigation }) {
     );
   };
 
-  const todayNotifications = notifications.filter((notif) => isToday(notif.created_at));
-  const oldNotifications = notifications.filter((notif) => !isToday(notif.created_at));
-  const displayedNotifications = activeTab === 'today' ? todayNotifications : oldNotifications;
+  const todayNotification = notification.filter((notif) => isToday(notif.created_at));
+  const oldNotification = notification.filter((notif) => !isToday(notif.created_at));
+  const displayedNotification = activeTab === 'today' ? todayNotification : oldNotification;
   const renderNotification = ({ item }) => (
     <TouchableOpacity
       style={[styles.notificationCard, !item.is_read && styles.unreadCard]}
@@ -205,9 +205,9 @@ function NotificationScreen({ navigation }) {
           <Text style={[styles.tabText, activeTab === 'today' && styles.activeTabText]}>
             Today
           </Text>
-          {todayNotifications.length > 0 && (
+          {todayNotification.length > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{todayNotifications.length}</Text>
+              <Text style={styles.badgeText}>{todayNotification.length}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -219,17 +219,17 @@ function NotificationScreen({ navigation }) {
           <Text style={[styles.tabText, activeTab === 'old' && styles.activeTabText]}>
             Old
           </Text>
-          {oldNotifications.length > 0 && (
+          {oldNotification.length > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{oldNotifications.length}</Text>
+              <Text style={styles.badgeText}>{oldNotification.length}</Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* Liste des notifications */}
+      {/* Liste des notification */}
       <FlatList
-        data={displayedNotifications}
+        data={displayedNotification}
         renderItem={renderNotification}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
@@ -260,9 +260,11 @@ function NotificationScreen({ navigation }) {
           <Icon name="add-circle-outline" size={30} color="#9CA3AF" />
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.navButton}>
-          onPress={() => router.push('notification')}
-          <Icon name="notifications-outline" size={30} color="#0b6f7c" />
+        <TouchableOpacity 
+       style={styles.navButton}
+       onPress={() => router.push('notification')}
+       >
+        <Icon name="notifications-outline" size={30} color="#0b6f7c" />
         </TouchableOpacity>
 
         <TouchableOpacity
