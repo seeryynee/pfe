@@ -81,7 +81,7 @@ export default function LoginScreen() {
           <Ionicons name="lock-closed-outline" size={20} color="#0b4f5c" />
           <TextInput
             placeholder="Password"
-             placeholderTextColor={"#555"}
+            placeholderTextColor={"#555"}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -168,7 +168,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 10,
     fontSize: 16,
-    marginLeft: 10
+    marginLeft: 10,
+    
   },
 
   forgot: {

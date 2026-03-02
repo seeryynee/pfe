@@ -1,10 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter } from 'expo-router';
 import { useState } from "react";
 import {
   Alert,
-  Keyboard,
   Modal,
   Platform,
   ScrollView,
@@ -12,10 +10,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Keyboard
 } from "react-native";
 import { Calendar } from 'react-native-calendars'; // 1. Added this import
-import Icon from 'react-native-vector-icons/Ionicons';
 import { supabase } from '../lib/supabase';
 
 export default function AddMedicationScreen() {
@@ -23,7 +21,6 @@ export default function AddMedicationScreen() {
   const [scheduleType, setScheduleType] = useState("consecutive");
   const [days, setDays] = useState(12);
   const [selectedDates, setSelectedDates] = useState([]);
-  const router = useRouter();
   
   // 2. Added markedDates to keep the circles visible
   const [markedDates, setMarkedDates] = useState({});
@@ -83,7 +80,7 @@ export default function AddMedicationScreen() {
       const hours = selectedTime.getHours().toString().padStart(2, '0');
       const minutes = selectedTime.getMinutes().toString().padStart(2, '0');
       const updated = [...takes];
-      updated[currentTakeIndex].time =`${hours}:${minutes}`;
+      updated[currentTakeIndex].time = `${hours}:${minutes}`;
       setTakes(updated);
     }
   };
@@ -118,6 +115,7 @@ export default function AddMedicationScreen() {
       }));
 
       await supabase.from('medication takes').insert(takesToInsert);
+
       if (scheduleType === "specific" && selectedDates.length > 0) {
         const datesToInsert = selectedDates.map(date => ({
           medication_id: medication.id,
@@ -140,7 +138,7 @@ export default function AddMedicationScreen() {
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Ionicons name="arrow-back-outline" size={30} color="#fff" />
+          <Ionicons name="arrow-back-outline" size={26} color="#fff" />
         </View>
 
         <View style={styles.inputWrapper}>
@@ -197,13 +195,20 @@ export default function AddMedicationScreen() {
             <Text style={[styles.scheduleBtnText, scheduleType === "specific" && styles.scheduleBtnTextActive]}>Pick Specific Days</Text>
           </TouchableOpacity>
         </View>
+
         {scheduleType === "consecutive" && (
           <View style={styles.cardnodays}>
             <Text style={styles.cardTitle}>Number of days</Text>
             <View style={styles.counterCenter}>
-              <TouchableOpacity style={styles.counterBtn} onPress={() => setDays(Math.max(1, days - 1))}><Text style={styles.counterTextnodays}>−</Text></TouchableOpacity>
-              <View style={styles.nodaysbox}><Text style={styles.counterValuenodays}>{days}</Text></View>
-              <TouchableOpacity style={styles.counterBtn} onPress={() => setDays(days + 1)}><Text style={styles.counterTextnodays}>+</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.counterBtn} onPress={() => setDays(Math.max(1, days - 1))}>
+                <Text style={styles.counterTextnodays}>−</Text>
+              </TouchableOpacity>
+              <View style={styles.nodaysbox}>
+                <Text style={styles.counterValuenodays}>{days}</Text>
+              </View>
+              <TouchableOpacity style={styles.counterBtn} onPress={() => setDays(days + 1)}>
+                <Text style={styles.counterTextnodays}>+</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -229,7 +234,7 @@ export default function AddMedicationScreen() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Select Time</Text>
-              <DateTimePicker value={tempDate} mode="time" is24Hour={true} display="spinner" onChange={onTimeChange} textColor="black" themeVariant="light" />
+              <DateTimePicker value={tempDate} mode="time" is24Hour={true} display="spinner" onChange={onTimeChange} textColor="black" themeVariant="light" fontWeight="600"/>
               <TouchableOpacity style={styles.fullWidthDoneBtn} onPress={() => setShowTimePicker(false)}>
                 <Text style={styles.modalDoneText}>Done</Text>
               </TouchableOpacity>
@@ -238,7 +243,7 @@ export default function AddMedicationScreen() {
         </Modal>
       )}
 
-      {/* --- DESIGN FIXED: CALENDAR MODAL WITH MULTI-CIRCLE --- */}
+      {/* --- CALENDAR MODAL WITH MULTI-CIRCLE --- */}
       {showCalendar && (
         <Modal transparent animationType="slide">
           <View style={styles.modalOverlay}>
@@ -249,16 +254,17 @@ export default function AddMedicationScreen() {
                 onDayPress={handleDayPress}
                 markedDates={markedDates}
                 theme={{
-                  todayTextColor: '#0b6f7c',
-                  arrowColor: '#0b6f7c',
+                  todayTextColor: '#4b4d4d',
+                  arrowColor: '#555',
                   selectedDayBackgroundColor: '#0a5f6a',
                   selectedDayTextColor: '#ffffff',
                   textDayFontWeight: '600',
                   textMonthFontWeight: 'bold',
                 }}
               />
+
               <View style={styles.modalButtonsRow}>
-                <TouchableOpacity style={styles.modalUnifiedBtn} onPress={() => setShowCalendar(false)}>
+                <TouchableOpacity style={styles.modalDoneBtn} onPress={() => setShowCalendar(false)}>
                   <Text style={styles.modalDoneText}>Done</Text>
                 </TouchableOpacity>
               </View>
@@ -266,339 +272,49 @@ export default function AddMedicationScreen() {
           </View>
         </Modal>
       )}
-      {/* Bottom Navigation */}
-          <View style={styles.bottomNav}>
-            <TouchableOpacity 
-              style={styles.navButton}
-              onPress={() => router.replace('home')}
-            >
-              <Icon name="home-outline" size={30} color="#9CA3AF" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.navButton}
-              onPress={() => router.replace('add')}
-            >
-              <Icon name="add-circle-outline" size={30} color="#0b6f7c" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-             style={styles.navButton}>
-              onPress={() =>router.replace('notification')}
-              <Icon name="notifications-outline" size={30} color="#9CA3AF" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.navButton}
-              onPress={() => router.replace('history')}
-            >
-              <Icon name="time-outline" size={30} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: 
-  { 
-    flex: 1, 
-    backgroundColor: "#0b4f5c" 
-  },
-  scrollContent: 
-  { 
-    paddingHorizontal: 16, 
-    paddingTop: 50, paddingBottom: 30
-   },
-  header: 
-  { 
-    flexDirection: "row", 
-    alignItems: "center",
-     marginBottom: 20 },
-  label: 
-  {
-     color: "#fff",
-      fontSize: 18,
-       marginBottom: 8,
-       fontWeight: "700", 
-       marginLeft: 10 
-      },
-  inputWrapper: 
-  {
-     marginBottom: 16
-   },
-  input: 
-  {
-     backgroundColor: "#e6e6e6", 
-     borderRadius: 20, 
-     paddingVertical: 12, 
-     paddingHorizontal: 20,
-     fontSize: 16,
-     height: 50
-     },
-  card: 
-  { 
-    backgroundColor: "#e6e6e6",
-    borderRadius: 39,
-    padding: 16,
-    marginBottom: 20,
-    height: 160 
-  },
-  cardHeader: 
-  { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    alignItems: "center"
-   },
-  cardTitle: 
-  { 
-    fontSize: 20, 
-    fontWeight: "700",
-    color: "#0b6f7c", 
-    paddingLeft: 4,
-    paddingTop: 1
-   },
-  plusCircle:
-   {
-    width: 32, 
-    height: 32, 
-    borderRadius: 16, 
-    backgroundColor: "#e6e6e6", 
-    justifyContent: "center",
-     alignItems: "center" 
-    },
-  row:
-   { 
-    flexDirection: "row", 
-    justifyContent: "space-evenly",
-     gap: 90, 
-     marginTop: 12 
-    },
-  smallLabel:
-   { fontSize: 17,
-     color: "#555",
-     fontWeight: "700", 
-     marginBottom: 4
-     },
-  timeBox: 
-  { 
-    flexDirection: "row",
-     alignItems: "center", 
-     backgroundColor: "#C1C1C1",
-      borderRadius: 16, 
-      height: 40, 
-      paddingHorizontal: 12,
-       paddingLeft: 9,
-        paddingVertical: 8 
-      },
-  timeText: 
-  { 
-    marginLeft: 5,
-     fontWeight: "700", 
-     fontSize: 17,
-      color: "#4F4F4F"
-     },
-  counter:
-   { 
-    flexDirection: "row",
-     alignItems: "center",
-    backgroundColor: "#C1C1C1",
-    borderRadius: 16,
-    paddingHorizontal: 5,
-    height: 40 
-        },
-  counterBtn: 
-  { 
-    paddingHorizontal: 10, 
-    paddingVertical: 4
-   },
-  counterTextdose: 
-  { 
-    fontSize: 22,
-     color: "#0b6f7c", 
-     fontWeight: "600"
-     },
-  counterValuedose: 
-  { 
-    fontSize: 18,
-    fontWeight: "700",
-     marginHorizontal: 6,
-      color: "#4F4F4F"
-     },
-  cardnodays: 
-  {
-     backgroundColor: "#e6e6e6",
-      borderRadius: 37, 
-      padding: 16,
-       marginBottom: 20,
-        height: 110 
-      },
-  counterCenter: 
-  {
-     flexDirection: "row",
-      alignItems: "center", 
-     justifyContent: "center", 
-     marginTop: 10 
-    },
-  nodaysbox: 
-  { 
-    flexDirection: "row",
-     alignItems: "center",
-     backgroundColor: "#C1C1C1", 
-     borderRadius: 15, 
-     paddingHorizontal: 20,
-      height: 40 
-    },
-  counterValuenodays: 
-  { 
-    fontSize: 20,
-     fontWeight: "700",
-      marginHorizontal: 6, 
-      color: "#4F4F4F"
-     },
-  counterTextnodays:
-   { 
-    fontSize: 29,
-     color: "#0b6f7c", 
-     fontWeight: "600"
-     },
-  cardstartday: 
-  { 
-    backgroundColor: "#e6e6e6", 
-    borderRadius: 37,
-    padding: 16,
-    marginBottom: 20,
-     height: 130 
-      },
-  dateBox: 
-  { 
-    flexDirection: "row",
-     alignItems: "center", 
-     backgroundColor: "#C1C1C1",
-     borderRadius: 20, 
-     paddingLeft: 22, 
-     marginTop: 10, 
-     height: 54, 
-     marginHorizontal: 70
-     },
-  dateText: 
-  { 
-    marginLeft: 8, 
-    fontWeight: "600", 
-    fontSize: 18, 
-    color: "#4F4F4F" 
-  },
-  scheduleSelector: 
-  { 
-    flexDirection: "row", 
-    gap: 10, 
-    marginBottom: 20 
-  },
-  scheduleBtn: 
-  { 
-    flex: 1,
-     backgroundColor: "#e6e6e6", 
-     borderRadius: 20,
-      padding: 15,
-       alignItems: "center"
-       },
-  scheduleBtnActive: 
-  { 
-    backgroundColor: "#0b6f7c" 
-  },
-  scheduleBtnText:
-   {
-     fontWeight: "700",
-      color: "#555" 
-    },
-  scheduleBtnTextActive:
-   { 
-    color: "#fff" 
-  },
-  addBtn: 
-  { 
-    backgroundColor: "#0a5f6a", 
-    borderRadius: 30, 
-    paddingVertical: 14, 
-    alignItems: "center", 
-    marginTop: 10
-   },
-  addText: 
-  {
-     color: "#fff",
-      fontSize: 19, 
-      fontWeight: "700" 
-    },
-  modalOverlay:
-   { flex: 1,
-     backgroundColor: 'rgba(0,0,0,0.5)', 
-     justifyContent: 'flex-end'
-     },
-  modalContent: 
-  { 
-    backgroundColor: '#fff', 
-    borderTopLeftRadius: 20, 
-    borderTopRightRadius: 20,
-     padding: 20, 
-     paddingBottom: 40 
-    },
-  modalTitle: 
-  {
-     fontSize: 20, 
-    fontWeight: '700',
-     color: '#0b6f7c', 
-     textAlign: 'center',
-      marginBottom: 15 
-    },
-  modalButtonsRow: 
-  { 
-    flexDirection: 'row', 
-    gap: 10,
-     marginTop: 15
-     },
-  modalUnifiedBtn: 
-  {
-     flex: 1, 
-    backgroundColor: '#0a5f6a',
-     padding: 15, 
-     borderRadius: 10,
-      alignItems: 'center' 
-    },
-  fullWidthDoneBtn: 
-  {
-     backgroundColor: '#0a5f6a',
-     padding: 15,
-      borderRadius: 10, 
-      alignItems: 'center',
-       marginTop: 15 
-      },
-  modalDoneText: 
-  { 
-    color: '#fff', fontSize: 16,
-     fontWeight: '600' 
-  },
-    bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingBottom: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  navButton: {
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  container: { flex: 1, backgroundColor: "#0b4f5c" },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 50, paddingBottom: 30 },
+  header: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+  label: { color: "#fff", fontSize: 18, marginBottom: 8, fontWeight: "700", marginLeft: 10 },
+  inputWrapper: { marginBottom: 16 },
+  input: { backgroundColor: "#e6e6e6", borderRadius: 20, paddingVertical: 12, paddingHorizontal: 20, fontSize: 16, height: 50 },
+  card: { backgroundColor: "#e6e6e6", borderRadius: 39, padding: 16, marginBottom: 20, height: 160 },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  cardTitle: { fontSize: 20, fontWeight: "700", color: "#0b6f7c", paddingLeft: 4, paddingTop: 1 },
+  plusCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#e6e6e6", justifyContent: "center", alignItems: "center" },
+  row: { flexDirection: "row", justifyContent: "space-evenly", gap: 90, marginTop: 12 },
+  smallLabel: { fontSize: 17, color: "#555", fontWeight: "700", marginBottom: 4 },
+  timeBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#C1C1C1", borderRadius: 16, height: 40, paddingHorizontal: 12, paddingLeft: 9, paddingVertical: 8 },
+  timeText: { marginLeft: 5, fontWeight: "700", fontSize: 17, color: "#4F4F4F" },
+  counter: { flexDirection: "row", alignItems: "center", backgroundColor: "#C1C1C1", borderRadius: 16, paddingHorizontal: 5, height: 40 },
+  counterBtn: { paddingHorizontal: 10, paddingVertical: 4 },
+  counterTextdose: { fontSize: 22, color: "#0b6f7c", fontWeight: "600" },
+  counterValuedose: { fontSize: 18, fontWeight: "700", marginHorizontal: 6, color: "#4F4F4F" },
+  cardnodays: { backgroundColor: "#e6e6e6", borderRadius: 37, padding: 16, marginBottom: 20, height: 110 },
+  counterCenter: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 10 },
+  nodaysbox: { flexDirection: "row", alignItems: "center", backgroundColor: "#C1C1C1", borderRadius: 15, paddingHorizontal: 20, height: 40 },
+  counterValuenodays: { fontSize: 20, fontWeight: "700", marginHorizontal: 6, color: "#4F4F4F" },
+  counterTextnodays: { fontSize: 29, color: "#0b6f7c", fontWeight: "600" },
+  cardstartday: { backgroundColor: "#e6e6e6", borderRadius: 37, padding: 16, marginBottom: 20, height: 130 },
+  dateBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#C1C1C1", borderRadius: 20, paddingLeft: 22, marginTop: 10, height: 54, marginHorizontal: 70 },
+  dateText: { marginLeft: 8, fontWeight: "600", fontSize: 18, color: "#4F4F4F" },
+  scheduleSelector: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  scheduleBtn: { flex: 1, backgroundColor: "#e6e6e6", borderRadius: 20, padding: 15, alignItems: "center" },
+  scheduleBtnActive: { backgroundColor: "#0b6f7c" },
+  scheduleBtnText: { fontWeight: "700", color: "#555" },
+  scheduleBtnTextActive: { color: "#fff" },
+  addBtn: { backgroundColor: "#0a5f6a", borderRadius: 30, paddingVertical: 14, alignItems: "center", marginTop: 10 },
+  addText: { color: "#fff", fontSize: 19, fontWeight: "700" },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent:'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#0b6f7c', textAlign: 'center', marginBottom: 15 },
+  modalButtonsRow: { flexDirection: 'row', gap: 10, marginTop: 15 },
+  modalDoneBtn: { flex: 1, backgroundColor: '#0a5f6a', padding: 15, borderRadius: 10, alignItems: 'center' },
+  fullWidthDoneBtn: { backgroundColor: '#0a5f6a', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 15 },
+  modalDoneText: { color: '#fff', fontSize: 17, fontWeight: '600' }
 });

@@ -44,7 +44,7 @@ export default function SignUpScreen() {
     }
     else {
       alert("Account created! You can now log in.");
-      router.push("/auth/login"); // redirige vers login après signup
+      router.push("/(tabs)/home"); 
     }
   } catch (err) {
     alert("Something went wrong: " + err.message);
@@ -135,7 +135,7 @@ export default function SignUpScreen() {
           Already have an account?{" "}
           <Text 
             style={styles.loginLink}
-            onPress={() => router.push('/login')}
+            onPress={() => router.push('/(auth)/login')}
           >
             Login
           </Text>
