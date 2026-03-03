@@ -89,7 +89,7 @@ export default function LoginScreen() {
           />
         </View>
 
-        <Text style={styles.forgot}>Forget Password?</Text>
+        
 
         {/* Login Button */}
          <TouchableOpacity 
@@ -170,13 +170,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 10
   },
-
-  forgot: {
-    textAlign: "right",
-    color: "#0b4f5c",
-    marginBottom: 20,
-  },
-
   button: {
     backgroundColor: "#0b4f5c",
     height: 50,
