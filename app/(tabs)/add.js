@@ -309,6 +309,7 @@ export default function AddMedicationScreen() {
                   textMonthFontWeight: 'bold',
                 }}
               />
+
               <View style={styles.modalButtonsRow}>
                 <TouchableOpacity style={styles.modalDoneBtn} onPress={() => setShowCalendar(false)}>
                   <Text style={styles.modalDoneText}>Done</Text>

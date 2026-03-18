@@ -14,6 +14,15 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 
+const formatTimeAmPm = (timeStr) => {
+  let [hours, minutes] = timeStr.split(':');
+  hours = parseInt(hours);
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; 
+  return `${hours}:${minutes} ${ampm}`;
+};
+
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,6 +36,11 @@ export default function HomeScreen() {
   const [editPatientAge, setEditPatientAge] = useState("");
   const [editPatientDisease, setEditPatientDisease] = useState("");
 
+  const todayDate = new Date();
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const currentMonth = monthNames[todayDate.getMonth()];
+  const currentDay = todayDate.getDate().toString().padStart(2, '0');
+
   useEffect(() => {
     loadData();
   }, []);
@@ -37,14 +51,12 @@ export default function HomeScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Fetch User Name
       if (user.user_metadata?.full_name) {
         setUserName(user.user_metadata.full_name);
       } else {
         setUserName(user.email.split('@')[0]);
       }
 
-      // 2. Fetch Patient Profile
       const { data: patient } = await supabase
         .from("patient_profile")
         .select("*")
@@ -53,15 +65,12 @@ export default function HomeScreen() {
       if (patient) {
         setPatientData({
           name: patient.patient_name,
-          age: patient.patient_age ? `${patient.patient_age} `: "",
+          age: patient.patient_age ? `${patient.patient_age}` : "",
           disease: patient.disease || "N/A"
         });
       }
 
-      // 3. Fetch Today's Medications
       await fetchTodaySchedule(user.id);
-      
-      // 4. Fetch Stock
       await fetchMedicationStock(user.id);
 
     } catch (error) {
@@ -75,7 +84,6 @@ export default function HomeScreen() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    // Get all meds
     const { data: meds } = await supabase.from("add med table").select("*").eq("user_id", userId);
     if (!meds) return;
 
@@ -136,6 +144,14 @@ export default function HomeScreen() {
         }
         stockList.push({ id: med.id, name: med.name, daysRemaining: remaining });
     }
+
+    // Sort: > 0 days at the top, 0 days at the bottom
+    stockList.sort((a, b) => {
+      if (a.daysRemaining > 0 && b.daysRemaining === 0) return -1;
+      if (a.daysRemaining === 0 && b.daysRemaining > 0) return 1;
+      return b.daysRemaining - a.daysRemaining; 
+    });
+
     setMedicationStock(stockList);
   };
 
@@ -173,6 +189,29 @@ export default function HomeScreen() {
     else { setShowPatientModal(false); loadData(); }
   };
 
+  // NEW: Function to delete finished medications
+  const deleteMedication = (medId) => {
+    Alert.alert(
+      "Remove Medication",
+      "Are you sure you want to delete this finished medication from the list?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive", 
+          onPress: async () => {
+            const { error } = await supabase.from("add med table").delete().eq("id", medId);
+            if (error) {
+              Alert.alert("Error", error.message);
+            } else {
+              loadData(); // Refresh list after deletion
+            }
+          } 
+        }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}>
@@ -188,49 +227,96 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Patient Card */}
+        {/* Patient Card - Updated Design */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Patient</Text>
           <TouchableOpacity style={styles.patientCard} onPress={openPatientModal}>
-            <View style={styles.infoRow}><Text style={styles.label}>Name:</Text><Text style={styles.value}>{patientData.name}</Text></View>
-            <View style={styles.infoRow}><Text style={styles.label}>Age:</Text><Text style={styles.value}>{patientData.age ? `${patientData.age} years old` : "N/A"}</Text></View>
-            <View style={styles.infoRow}><Text style={styles.label}>Disease:</Text><Text style={styles.value}>{patientData.disease}</Text></View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Name</Text>
+              <Text style={styles.value}>{patientData.name}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Age</Text>
+              <Text style={styles.value}>{patientData.age ? `${patientData.age} years old` : "N/A"}</Text>
+            </View>
+            <View style={[styles.infoRow, {marginBottom: 0}]}>
+              <Text style={styles.label}>Disease</Text>
+              <Text style={styles.value}>{patientData.disease}</Text>
+            </View>
           </TouchableOpacity>
         </View>
+
         {/* Schedule Horizontal Scroll */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Schedule</Text>
           {todaySchedule.length === 0 ? (
             <View style={styles.emptyCard}><Text style={styles.emptyText}>No medications for today</Text></View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20 }}>
               {todaySchedule.map((item) => (
                 <View key={item.id} style={styles.scheduleCard}>
-                  <View style={styles.iconContainer}>
-                    {item.taken ? <Ionicons name="checkmark-circle" size={32} color="#27ae60" /> :
-                     item.pending ? <Ionicons name="time" size={32} color="#f39c12" /> :
-                     <Ionicons name="alert-circle" size={32} color="#e74c3c" />}
+                  <View style={styles.cardTopRow}>
+                    <Text style={styles.cardTime}>{formatTimeAmPm(item.time)}</Text>
+                    <View style={styles.cardDateBox}>
+                      <Text style={styles.cardMonth}>{currentMonth}</Text>
+                      <Text style={styles.cardDay}>{currentDay}</Text>
+                    </View>
                   </View>
-                  <Text style={styles.cardMedName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={styles.cardTime}>{item.time.substring(0,5)}</Text>
-                  <Text style={styles.cardDose}>{item.dose} Dose</Text>
+                  
+                  <View style={styles.cardMiddleRow}>
+                    <Text style={styles.cardMedName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.cardDose}>{item.dose}mm</Text>
+                  </View>
+
+                  <View style={styles.cardBottomRow}>
+                    {item.taken ? <Ionicons name="checkmark-circle" size={34} color="#0b6f7c" /> :
+                     item.pending ? <Ionicons name="time" size={34} color="#0b6f7c" /> :
+                     <Ionicons name="alert-circle" size={34} color="#0b6f7c" />}
+                  </View>
                 </View>
               ))}
             </ScrollView>
           )}
         </View>
 
-        {/* Stock Vertical List */}
+        {/* Stock Vertical List - Updated Sorting and Colors */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Medication Stock</Text>
-          {medicationStock.map((item) => (
-            <View key={item.id} style={styles.stockCard}>
-              <Text style={styles.stockName}>{item.name}</Text>
-              <Text style={[styles.stockDays, { color: item.daysRemaining <= 3 ? '#e74c3c' : '#27ae60' }]}>
-                {item.daysRemaining} days left
-              </Text>
-            </View>
-          ))}
+          
+          <View style={styles.stockMainCard}>
+            <ScrollView 
+              style={styles.stockScrollArea}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
+              {medicationStock.map((item, index) => (
+                <View key={item.id} style={[styles.stockItemRow, index === medicationStock.length - 1 && {marginBottom: 0}]}>
+                  <View style={styles.stockTextContainer}>
+                    <Text style={styles.stockItemName}>{item.name} :</Text>
+                    <Text 
+                      style={[
+                        styles.stockItemDays, 
+                        // Green if days > 0, dark grey if 0
+                        { color: item.daysRemaining > 0 ? '#27ae60' : '#555' } 
+                      ]}
+                    >
+                      {' '}{item.daysRemaining} days remaining
+                    </Text>
+                  </View>
+                  
+                  {/* Delete Button - Only shows if daysRemaining === 0 */}
+                  {item.daysRemaining === 0 && (
+                    <TouchableOpacity onPress={() => deleteMedication(item.id)} style={styles.deleteBtn}>
+                      <Ionicons name="trash" size={20} color="#e74c3c" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+              {medicationStock.length === 0 && (
+                 <Text style={{color: '#666', textAlign: 'center', marginTop: 10}}>No medications in stock.</Text>
+              )}
+            </ScrollView>
+          </View>
         </View>
       </ScrollView>
 
@@ -252,31 +338,139 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b4f5c' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, marginTop: 20 },
   helloText: { color: '#fff', fontSize: 16 },
   userTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
   profileIconCircle: { backgroundColor: '#fff', padding: 8, borderRadius: 50 },
-  sectionContainer: { paddingLeft: 20, marginBottom: 25 },
-  sectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
-  patientCard: { backgroundColor: 'rgba(255, 255, 255, 0.9)', marginRight: 20, borderRadius: 20, padding: 18 },
-  infoRow: { flexDirection: 'row', marginBottom: 6 },
-  label: { width: 75, fontWeight: 'bold', color: '#06333f' },
-  value: { color: '#0b4f5c', flex: 1 },
-  scheduleCard: { backgroundColor: '#fff', borderRadius: 16, padding: 15, marginRight: 12, width: 130, alignItems: 'center' },
-  iconContainer: { marginBottom: 8 },
-  cardMedName: { fontSize: 15, fontWeight: 'bold', color: '#06333f' },
-  cardTime: { fontSize: 14, color: '#06333f', fontWeight: '600' },
-  cardDose: { fontSize: 12, color: '#666' },
-  stockCard: { backgroundColor: 'rgba(255, 255, 255, 0.9)', marginRight: 20, borderRadius: 15, padding: 15, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between' },
-  stockName: { fontWeight: 'bold', color: '#06333f' },
-  stockDays: { fontWeight: 'bold' },
+  sectionContainer: { paddingLeft: 20, marginBottom: 25, paddingRight: 20 },
+  sectionTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
+  
+  /* --- UPDATED PATIENT CARD STYLES --- */
+  patientCard: { 
+    backgroundColor: '#e6e6e6', 
+    borderRadius: 40, 
+    padding: 25,
+    paddingHorizontal: 30
+  },
+  infoRow: { 
+    flexDirection: 'row', 
+    marginBottom: 12,
+    alignItems: 'center'
+  },
+  label: { 
+    width: 90, 
+    fontSize: 18,
+    fontWeight: 'bold', 
+    color: '#0b6f7c' 
+  },
+  value: { 
+    fontSize: 18,
+    color: '#555', 
+    flex: 1,
+    fontWeight: '600'
+  },
+
+  scheduleCard: { 
+    backgroundColor: '#e6e6e6', 
+    borderRadius: 40, 
+    padding: 18, 
+    marginRight: 15, 
+    width: 160, 
+    height: 160,
+    justifyContent: 'space-between' 
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start'
+  },
+  cardTime: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0b6f7c',
+    marginTop: 4
+  },
+  cardDateBox: {
+    alignItems: 'center'
+  },
+  cardMonth: {
+    fontSize: 11,
+    color: '#0b6f7c',
+    fontWeight: '700'
+  },
+  cardDay: {
+    fontSize: 16,
+    color: '#0b6f7c',
+    fontWeight: '800',
+    marginTop: -2
+  },
+  cardMiddleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginTop: 5
+  },
+  cardMedName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  cardDose: {
+    fontSize: 11,
+    color: '#888',
+    marginLeft: 3,
+    fontWeight: '600'
+  },
+  cardBottomRow: {
+    alignItems: 'center',
+    marginBottom: 5
+  },
+
+  /* --- STOCK CARD STYLES --- */
+  stockMainCard: {
+    backgroundColor: '#e6e6e6',
+    borderRadius: 40, 
+    paddingVertical: 25,
+    paddingHorizontal: 25,
+    maxHeight: 180, 
+  },
+  stockScrollArea: {
+    flexGrow: 0,
+  },
+  stockItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16, 
+  },
+  stockTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  stockItemName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0b6f7c',
+  },
+  stockItemDays: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  deleteBtn: {
+    padding: 5,
+    marginLeft: 10,
+  },
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 25, width: '85%' },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#0b6f7c', textAlign: 'center', marginBottom: 15 },
   input: { backgroundColor: '#f0f0f0', borderRadius: 10, padding: 12, marginBottom: 10 },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  saveBtn: { backgroundColor: '#0b4f5c', padding: 12, borderRadius: 10, width: '45%', alignItems: 'center' },
+  saveBtn: { backgroundColor: '#0a5f6a', padding: 12, borderRadius: 10, width: '45%', alignItems: 'center' },
   cancelBtn: { backgroundColor: '#eee', padding: 12, borderRadius: 10, width: '45%', alignItems: 'center' },
   emptyCard: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 20, marginRight: 20, borderRadius: 15 },
   emptyText: { color: '#fff', textAlign: 'center' }
