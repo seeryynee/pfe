@@ -1,4 +1,3 @@
-
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -13,55 +12,91 @@ import {
 } from "react-native";
 import { supabase } from '../lib/supabase';
 
-
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(true);
-   // Vérifie si déjà connecté au chargement
+
+  // Vérifie si déjà connecté au chargement
   useEffect(() => {
     checkUserSession();
   }, []);
 
-  const checkUserSession = async () => {
+  const routeUserBasedOnRole = async (userId) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-       
-        router.replace("/(tabs)/confirmation");
+      const { data: caregiver } = await supabase
+        .from('care_giver')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle(); // ✅ maybeSingle pas single
+
+      if (caregiver) {
+        router.replace("/(tabs)/home");
+        return;
       }
+
+      const { data: patient } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle(); // ✅ maybeSingle pas single
+
+      if (patient) {
+        router.replace("/(tabs)/confirmation");
+        return;
+      }
+
+      // ✅ Par défaut → home SANS alert
+      router.replace("/(tabs)/home");
+
     } catch (error) {
-      console.log("Erreur vérification session:", error);
-    } finally {
+      console.log("Error routing user:", error);
       setLoading(false);
     }
   };
-  const handleLogin = async () => {
-  if (!email || !password) {
-    alert("Please enter email and password");
-    return;
-  }
 
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: password,
-    });
-
-    if (error) {
-      alert(error.message);
-    } else {
-      // Session sauvegardée automatiquement par Supabase ✅
-      // Pas besoin d'AsyncStorage, Supabase gère ça pour toi !
-      router.push('/(tabs)/confirmation');
+  // ✅ checkUserSession — ne touche pas
+  const checkUserSession = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await routeUserBasedOnRole(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.log("Erreur vérification session:", error);
+      setLoading(false);
     }
-  } catch (err) {
-    alert(err.message);
-  }
-};
-// ← Ajoute cet écran de chargement
+  };
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      alert("Please enter email and password");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) { 
+        alert(error.message); 
+        return; 
+      }
+
+      // ✅ Utilise routeUserBasedOnRole déjà définie
+      await routeUserBasedOnRole(data.user.id);
+
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Écran de chargement
   if (loading) {
     return (
       <View style={styles.container}>
@@ -81,32 +116,28 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-         {/* Images en haut */}
+      {/* Images en haut */}
       <View style={styles.topSection}>
-    <Image
-      source={require("../../assets/images/adn.png")}
-      style={styles.adn}
-    />
-    <Image
-      source={require("../../assets/images/Pill.png")}
-      style={styles.Pill}
-    />
-  </View>
+        <Image
+          source={require("../../assets/images/adn.png")}
+          style={styles.adn}
+        />
+        <Image
+          source={require("../../assets/images/Pill.png")}
+          style={styles.Pill}
+        />
+      </View>
 
-   
-    
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.hello}>Hello!</Text>
         <Text style={styles.welcome}>Welcome to Remed</Text>
-
-        
       </View>
 
       {/* Card */}
       <View style={styles.card}>
         <Text style={styles.title}>Login</Text>
-
+        
         {/* Email */}
         <View style={styles.inputContainer}>
           <Ionicons name="mail-outline" size={20} color="#0b4f5c" />
@@ -116,16 +147,16 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
             style={styles.input}
+            autoCapitalize="none"
           />
         </View>
-        
 
         {/* Password */}
         <View style={styles.inputContainer}>
           <Ionicons name="lock-closed-outline" size={20} color="#0b4f5c" />
           <TextInput
             placeholder="Password"
-             placeholderTextColor={"#555"}
+            placeholderTextColor={"#555"}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -133,54 +164,46 @@ export default function LoginScreen() {
           />
         </View>
 
-        
-
         {/* Login Button */}
-         <TouchableOpacity 
-         style={styles.button}
-         onPress={handleLogin}
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={handleLogin}
         >
-        <Text style={styles.buttonText}>Login</Text>
-         </TouchableOpacity>
+          <Text style={styles.buttonText}>Login</Text>
+        </TouchableOpacity>
+        
         <Text style={styles.signup}>
-        Don’t have account?{" "}
-        <Text 
-       style={styles.signupLink}
-       onPress={() => router.push('signup')}
-         >
-       Sign Up
-      </Text>
-      </Text>
+          Don't have account?{" "}
+          <Text 
+            style={styles.signupLink}
+            onPress={() => router.push('signup')}
+          >
+            Sign Up
+          </Text>
+        </Text>
       </View>
     </View>
   );
-  
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#0b4f5c",
   },
-
   header: {
     padding: 30,
   },
-
   hello: {
     fontSize: 52,
     color: "white",
     fontWeight: "bold",
-
   },
-
   welcome: {
     color: "white",
     fontSize: 18,
     marginTop: 5,
   },
-
- 
-
   card: {
     flex: 1,
     backgroundColor: "#eaeaea",
@@ -188,31 +211,26 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 40,
     padding: 25,
   },
-
   title: {
     fontSize: 26,
     fontWeight: "bold",
     marginBottom: 20,
     color: "#0b4f5c",
   },
-
   inputContainer: {
-    backgroundColor: "white",
-    borderRadius: 30,
-    paddingHorizontal: 20,
-    marginBottom: 15,
-    height: 50,
-    justifyContent: "center",
-    flexDirection: "row",
-    alignItems: "center"
+    backgroundColor: "white", 
+    borderRadius: 30, 
+    paddingHorizontal: 20, 
+    marginBottom: 15, 
+    height: 55, 
+    flexDirection: "row", 
+    alignItems: "center",
+    elevation: 2,
   },
-
   input: {
     flex: 1,
     fontSize: 16,
     marginLeft: 10,
-    fontSize: 16,
-    marginLeft: 10
   },
   button: {
     backgroundColor: "#0b4f5c",
@@ -222,29 +240,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-
   buttonText: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
   },
-
   signup: {
     textAlign: "center",
     color: "#555",
   },
-
   signupLink: {
     color: "#0b4f5c",
     fontWeight: "bold",
   },
   /* ===== Images top ===== */
-
   topSection: {
     height: 140,
     position: "relative",
   },
-
   adn: {
     position: "absolute",
     top: 0,
@@ -253,15 +266,14 @@ const styles = StyleSheet.create({
     height: 100,
     resizeMode: "contain",
   },
-
   Pill: {
     position: "absolute",
     right: 1,
     bottom: -20,
     width: 250,
-    height:250,
+    height: 250,
     resizeMode: "contain",
-    transform: [{ translateY: 180}], 
+    transform: [{ translateY: 180 }], 
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,

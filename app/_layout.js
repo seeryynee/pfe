@@ -3,8 +3,22 @@ import { Stack, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 // ✅ Fonction pour créer les channels
 async function registerNotificationChannels() {
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    console.log('Permission refusée');
+    return;
+  }
+  
   if (Platform.OS === 'android') {
     // ✅ CHANNEL 1 : Pour les ALARMES de médicaments (medication time)
     await Notifications.setNotificationChannelAsync('medication-reminders-v3', {
@@ -31,7 +45,7 @@ export default function RootLayout() {
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('🔔 Notification cliquée !', response);
 
-      const data: any = response.notification.request.content.data;
+      const data = response.notification.request.content.data;
 
       // ✅ Redirige selon le type de notification
       if (data?.type === 'medication_reminder') {
@@ -55,4 +69,4 @@ export default function RootLayout() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     </Stack>
   );
-  }
+}

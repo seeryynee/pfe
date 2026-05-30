@@ -15,14 +15,22 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { supabase } from '../lib/supabase';
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
- export default function NotificationScreen({ navigation }) {
+
+const getLocalDateString = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getLocalISOString = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return new Date(now - offset).toISOString();
+};
+
+ export default function NotificationScreen() {
   const [notification, setNotification] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('today');
@@ -46,8 +54,7 @@ Notifications.setNotificationHandler({
         setPatients(patientsData);
       }
       
-      await fetchNotification();
-      await checkMissedMedications();
+
     } catch (error) {
       console.error("Init error:", error);
     }
@@ -56,11 +63,12 @@ Notifications.setNotificationHandler({
   // ✅ 2. RAFRAÎCHISSEMENT AUTOMATIQUE QUAND ON ARRIVE SUR LA AGE
   useFocusEffect(
     useCallback(() => {
-      initData();
-     
-      
-      const checkInterval = setInterval(checkMissedMedications, 30 * 1000);
-      
+      initData(); 
+      const interval = setInterval(() => {
+      if (selectedId) {
+        checkMissedMedications();
+      }
+      }, 30000); // 30 secondes
       const notificationSubscription = supabase
         .channel('notification-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'notification' }, () => {
@@ -69,7 +77,7 @@ Notifications.setNotificationHandler({
         .subscribe();
 
       return () => {
-        clearInterval(checkInterval);
+        clearInterval(interval);
         notificationSubscription.unsubscribe();
       };
     }, [selectedId]) // Se relance si on change de patient
@@ -81,14 +89,14 @@ Notifications.setNotificationHandler({
     if (!user || !selectedId) return;
 
     const now = new Date();
-    const currentDate = now.toISOString().split('T')[0];
+    const currentDate = getLocalDateString();
     const currentTime = now.toTimeString().slice(0, 8);
 
     // Récupère tous les médicaments programmés aujourd'hui
     const { data: allTakes } = await supabase
-      .from('schedule')
-      .select('*,patient_medications (id, schedule_type, start_date, num_of_days, medication(name))')
-      .eq('patient_medications.patient_id', selectedId);
+      .from('intake_time')
+      .select('*,prescription (id, schedule_type, start_date, num_of_days, medication(name))')
+      .eq('prescription.patient_id', selectedId);
       if (!selectedId) 
       return;
    
@@ -98,10 +106,11 @@ Notifications.setNotificationHandler({
     for (const take of allTakes) {
       const scheduledTime = take.time; 
       const medName =
-       take.patient_medications?.medication?.name || "Medication";
-      const scheduleType = take.patient_medications?.schedule_type;
-      const startDate = take.patient_medications?.start_date;
-      const numOfDays = take.patient_medications?.num_of_days; 
+       take.prescription?.medication?.name || "Medication";
+      const scheduleType = take.prescription?.schedule_type;
+      const startDate = take.prescription?.start_date;
+      const numOfDays = take.prescription?.num_of_days; 
+      const prescriptionId = take.prescription?.id;
         
       let isProgrammedToday = false;
       if (scheduleType === 'consecutive') {
@@ -118,7 +127,7 @@ Notifications.setNotificationHandler({
         const { data: scheduledToday } = await supabase
           .from('specific_medication_dates')
           .select('*')
-          .eq('patient_medication_id', take.patient_medication_id)
+          .eq('prescription_id', prescriptionId)
           .eq('scheduled_date', currentDate);
 
         isProgrammedToday = scheduledToday && scheduledToday.length > 0;
@@ -146,8 +155,9 @@ Notifications.setNotificationHandler({
           .from('history')
           .select('*')
           .eq('patient_id', selectedId)
-          .eq('patient_medication_id', take.patient_medication_id)
-          .eq('schedule_id', take.id)
+          .eq('prescription_id', prescriptionId)
+          .eq('intake_time_id', take.id)
+          .eq('status','taken')
           .gte('taken_at', `${currentDate}T00:00:00`)
           .lte('taken_at', `${currentDate}T23:59:59`);
 
@@ -157,7 +167,7 @@ Notifications.setNotificationHandler({
             .from('notification')
             .select('*')
             .eq('caregiver_id', user.id)
-            .eq('patient_medication_id', take.patient_medication_id)
+            .eq('prescription_id', prescriptionId)
             .eq('scheduled_time', scheduledTime)
             .gte('created_at',` ${currentDate}T00:00:00`);
             if (existingNotif && existingNotif.length > 0) {
@@ -176,7 +186,7 @@ Notifications.setNotificationHandler({
             const { data:insertNotif,error: insertError } =
             await supabase.from('notification').insert({
               caregiver_id: user.id,
-              patient_medication_id: take.patient_medication_id,
+              prescription_id: prescriptionId,
               patient_id: selectedId,
               scheduled_time: scheduledTime,
               type: 'missed',
@@ -194,7 +204,19 @@ Notifications.setNotificationHandler({
                 console.log("notification created");
                 
              }
-                   
+              // ✅ Marque dans history comme "missed"
+                  
+              await supabase.from('history').insert({
+                patient_id: selectedId,
+                prescription_id: prescriptionId,
+                intake_time_id: take.id,
+                scheduled_time: scheduledTime,
+                status: 'missed',
+                taken_at: null,
+              });
+
+              console.log(" History entry created");
+               
             try {          
               await Notifications.scheduleNotificationAsync({
                content: {
@@ -205,25 +227,16 @@ Notifications.setNotificationHandler({
       
                },
                
-               trigger: null, 
-
+               trigger: {
+               channelId:'medication-reminders-v3', 
+},
              });
                 console.log("notification sent");
             } catch (notifError) {
                 console.error ("push notification error:", notifError);
                 
-              // ✅ Marque dans history comme "missed"
-              await supabase.from('history').insert({
-                patient_id: selectedId,
-                patient_medication_id: take.patient_medication_id,
-                schedule_id: take.id,
-                scheduled_time: scheduledTime,
-                status: 'missed',
-                taken_at: null,
-              });
-
-              console.log(" History entry created");
-               }
+            }
+             
          } 
        }
       }
@@ -232,9 +245,7 @@ Notifications.setNotificationHandler({
     console.error(" checkMissedMedications error:", error);
   }
 };
-           
-    
-  
+
 
   useEffect(() => {
      const init = async () => {
@@ -251,42 +262,16 @@ Notifications.setNotificationHandler({
         setPatients(data);
       }
     }
-  fetchNotification();
-  checkMissedMedications(); 
+
   };
   init();
-  const checkInterval = setInterval(checkMissedMedications, 30 * 1000);
-
-  // Canal 1 : Écoute les changements dans la table 'notification' (votre code actuel)
-  const notificationSubscription = supabase
-    .channel('notification-channel')
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'notification',
-      },
-      (payload) => {
-        console.log('Notification changée:', payload);
-        fetchNotification();
-      }
-    )
-    .subscribe();
-    
-
-  
-  return () => {
-    clearInterval(checkInterval);
-    notificationSubscription.unsubscribe();
-    
-  };
 }, []);
    useEffect(() => {
     if (selectedId) {
       console.log("Patient sélectionné :", selectedName);
       fetchNotification();      // Recharge les notifications du patient choisi
-      checkMissedMedications(); // Vérifie les retards pour ce patient précis
+      checkMissedMedications();
+      
     }
   }, [selectedId]); // Se déclenche dès que selectedId change (clic sur la Chip)
 
@@ -298,7 +283,7 @@ Notifications.setNotificationHandler({
       return;
     }
 
-    // On retire la jointure patient_medications qui fait planter
+  
     const { data, error } = await supabase
       .from('notification')
       .select('*') // On prend tout simplement
