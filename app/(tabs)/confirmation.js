@@ -151,7 +151,7 @@ export default function ConfirmationScreen() {
         .from('intake_time')
         .select(`
           *,
-          prescription!inner( //joinde prescription table (valide)
+          prescription!inner(  
             id,
             patient_id,
             medication_id,
