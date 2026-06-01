@@ -23,7 +23,11 @@ const getLocalDateString = () => {
   const d = String(now.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
-
+const getLocalISOString = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return new Date(now - offset).toISOString();
+};
 
 
  export default function NotificationScreen() {
@@ -192,7 +196,7 @@ const getLocalDateString = () => {
               message: `"${patientName}" missed "${medName}" scheduled at ${scheduledTime.slice(0, 5)}`,
               show_call_button: true,
               is_read: false,
-              created_at: now.toISOString(),
+              created_at: getLocalISOString(),
             })
             .select();
              if (insertError) {
