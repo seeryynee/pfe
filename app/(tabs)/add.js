@@ -147,7 +147,7 @@ export default function AddMedicationScreen() {
           content: {
             title: `⏰ Medication Time - ${patientName}`,
             body: `💊 ${take.time} — ${patientName}, take your ${medName} (${take.dose} pill(s))`,
-            sound: 'alarm_sounds.wav',
+            sound: 'default',
             data: { type: 'medication_reminder', pmId, patientName, dose: take.dose, time: take.time , intake_time_id: intakeTimeId,},
           },
           trigger: { type: 'date', date: triggerDate },
@@ -159,7 +159,7 @@ export default function AddMedicationScreen() {
           content: {
             title: `🚨 Medication Missed - ${patientName}`,
             body: `💊 ${patientName} missed ${medName} at ${take.time} (${take.dose} pill(s))`,
-            sound: 'alarm_sounds.wav',
+            sound: 'default',
             data: { type: 'medication_missed',intake_time_id: intakeTimeId, time: take.time },
           },
           trigger: { type: 'date', date: reminderDate },

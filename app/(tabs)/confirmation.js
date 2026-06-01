@@ -14,7 +14,7 @@ import {
 import { supabase } from '../lib/supabase';
 
 
-// ── Local date helpers ────────────────────────────────────────────────────────
+
 const getLocalDateString = () => {
   const now = new Date();
   const y = now.getFullYear();
@@ -23,16 +23,16 @@ const getLocalDateString = () => {
   return `${y}-${m}-${d}`;
 };
 
-// Local ISO string without UTC shift (for taken_at inserts)
+// retourne la date et l'heur local sans decalage UTC pour que supabase comprend l'heur local
 const getLocalISOString = () => {
   const now    = new Date();
-  const offset = now.getTimezoneOffset() * 60_000;
+  const offset = now.getTimezoneOffset() * 60_000;//getTimezoneOffset retourne la deff en min entre utc et heur local de tlf
   return new Date(now - offset).toISOString();
 };
 
 export default function ConfirmationScreen() {
   const router = useRouter();
-  const [loading, setLoading]           = useState(false);
+  const [loading, setLoading]           = useState(false);//valeur au demmarage false car pas de chargement au demmarage
   const [patientId, setPatientId]       = useState(null);
   const [patientName, setPatientName]   = useState('');
   const [currentMeds, setCurrentMeds]   = useState([]);
@@ -52,20 +52,18 @@ export default function ConfirmationScreen() {
     }, [patientId])
   );
 
-  // ────────────────────────────────────────────────────────────────────────
-  // Get the logged-in patient's row
-  // ────────────────────────────────────────────────────────────────────────
+
   const getPatientInfo = async () => {
     try {
       const { data: { user }, error: authErr } = await supabase.auth.getUser();
       if (authErr || !user) { router.replace('/(auth)/login'); return; }
 
-      // ✅ patients.id = auth.uid() — no user_id column
+      
       const { data: patient, error } = await supabase
         .from('patients')
         .select('id, name')
         .eq('id', user.id)
-        .maybeSingle();
+        .maybeSingle();//elle retourne un seul res ou null (null si 0 res)
 
       if (error) throw error;
 
@@ -85,14 +83,12 @@ export default function ConfirmationScreen() {
     }
   };
 
-  // ────────────────────────────────────────────────────────────────────────
+
   // Fetch medications scheduled for TODAY that are within ±60 min of now
   // and haven't been taken yet.
-  //
+
   // FIX: now checks whether each prescription is actually active today
-  // (consecutive date range OR specific scheduled date) before including
-  // its intake slots — preventing expired/unscheduled meds from showing up.
-  // ────────────────────────────────────────────────────────────────────────
+  
   const fetchMedsForToday = async () => {
     if (!patientId) return;
     setLoading(true);
@@ -101,7 +97,7 @@ export default function ConfirmationScreen() {
       const now      = new Date();
       const nowMin   = now.getHours() * 60 + now.getMinutes();
 
-      // ── Already-taken intake_time ids today ──
+      // recuperer les meds deja pris for today
       const { data: takenMeds } = await supabase
         .from('history')
         .select('intake_time_id')
@@ -110,9 +106,9 @@ export default function ConfirmationScreen() {
         .gte('taken_at', `${todayStr}T00:00:00`)
         .lte('taken_at', `${todayStr}T23:59:59`);
 
-      const takenIds = takenMeds?.map(t => t.intake_time_id) ?? [];
+      const takenIds = takenMeds?.map(t => t.intake_time_id) ?? [];//si takenMeds exist fait le map (transforme chaque elm d'un array) et si takenMeds n'existe pas retourne undifined
 
-      // ── All prescriptions for this patient ──
+      // All prescriptions for this patient 
       const { data: prescriptions, error: rxErr } = await supabase
         .from('prescription')
         .select('id, schedule_type, start_date, num_of_days, medication(name)')
@@ -121,7 +117,7 @@ export default function ConfirmationScreen() {
       if (rxErr) throw rxErr;
       if (!prescriptions?.length) { setCurrentMeds([]); return; }
 
-      // ── Filter to prescriptions active today ──
+      // Filter to prescriptions active today
       const activePrescriptionIds = [];
 
       for (const pm of prescriptions) {
@@ -129,10 +125,11 @@ export default function ConfirmationScreen() {
 
         if (pm.schedule_type === 'consecutive') {
           if (pm.start_date && pm.num_of_days) {
-            const start    = new Date(`${pm.start_date}T00:00:00`);
+            const start    = new Date(`${pm.start_date}T00:00:00`);//jusqu'a minuit 
             const today    = new Date(`${todayStr}T00:00:00`);
-            const diffDays = Math.round((today - start) / 86_400_000);
-            activeToday    = diffDays >= 0 && diffDays < parseInt(pm.num_of_days, 10);
+            const diffDays = Math.round((today - start) / 86_400_000);//transforme la diff donner en milli second en jours
+            //Math.round arrondir le nombre le plus proche 
+            activeToday    = diffDays >= 0 && diffDays < parseInt(pm.num_of_days, 10);//transforme num of days en int base 10
           }
         } else if (pm.schedule_type === 'specific') {
           const { data: spec } = await supabase
@@ -149,12 +146,12 @@ export default function ConfirmationScreen() {
 
       if (activePrescriptionIds.length === 0) { setCurrentMeds([]); return; }
 
-      // ── Fetch intake slots only for active prescriptions ──
+      //Fetch intake slots only for active prescriptions
       const { data: allTakes, error: takesErr } = await supabase
         .from('intake_time')
         .select(`
           *,
-          prescription!inner(
+          prescription!inner( //joinde prescription table (valide)
             id,
             patient_id,
             medication_id,
@@ -165,7 +162,7 @@ export default function ConfirmationScreen() {
 
       if (takesErr) throw takesErr;
 
-      // ── Keep only slots within ±60 min of now that aren't taken ──
+      //garder que les meds proche ±60 min of now that aren't taken 
       const medsFound = (allTakes ?? []).filter(take => {
         const [h, m]   = take.time.split(':').map(Number);
         const takeMin  = h * 60 + m;
@@ -180,18 +177,16 @@ export default function ConfirmationScreen() {
       setSelectedMeds([]);
     } catch (err) {
       console.error('[fetchMedsForToday] error:', err.message);
-    } finally {
+    } finally { //finally executentjrs en succes ou errur 
       setLoading(false);
     }
   };
 
-  // ────────────────────────────────────────────────────────────────────────
-  // Confirm medication taken
-  // ────────────────────────────────────────────────────────────────────────
+
   const handleConfirm = async (singleMed = null) => {
     const medsToProcess = singleMed
-      ? [singleMed]
-      : currentMeds.filter(m => selectedMeds.includes(m.id));
+      ? [singleMed] // si singleMed existe 
+      : currentMeds.filter(m => selectedMeds.includes(m.id));//garder les Meds cochees
 
     if (medsToProcess.length === 0) {
       Alert.alert('Selection', 'Please select at least one medication.');
@@ -204,7 +199,7 @@ export default function ConfirmationScreen() {
         .from('patients')
         .select('caregiver_id')
         .eq('id', patientId)
-        .single();
+        .single();//recuperer une seul ligne
 
       if (!patientData) throw new Error('Patient not found');
 
@@ -212,28 +207,28 @@ export default function ConfirmationScreen() {
 
       for (const med of medsToProcess) {
         const allScheduled = await Notifications
-        .getAllScheduledNotificationsAsync();
+        .getAllScheduledNotificationsAsync();//pour chaque med recuperer tout les notif programmes
 
-      // LIGNE 2 : Pour chaque notification programmée
+      
       for (const scheduled of allScheduled) {
 
-        // LIGNE 3 : Récupère les données de cette notif
+        // Récupère les données de cette notif
         const notifData = scheduled.content.data;
 
-        // LIGNE 4 : Vérifie si c'est pour CE médicament
+        //Vérifie si cette notif appartient au med actuelle
         if (notifData?.intake_time_id === med.id) {
 
-          // LIGNE 5 : Annule cette notification
+          //Annule cette notification
           await Notifications
             .cancelScheduledNotificationAsync(
               scheduled.identifier
             );
 
-          console.log("✅ Notification annulée:", 
+          console.log(" Notification annulée:", 
             scheduled.identifier);
         }
       }
-        // Insert history entry
+        
         const { error: histErr } = await supabase.from('history').insert({
           patient_id:      patientId,
           prescription_id: med.prescription?.id,
@@ -244,7 +239,7 @@ export default function ConfirmationScreen() {
         });
         if (histErr) { console.error('[handleConfirm] history error:', histErr.message); throw histErr; }
 
-        // Notify caregiver
+        
         const { error: notifErr } = await supabase.from('notification').insert({
           caregiver_id:    patientData.caregiver_id,
           patient_id:      patientId,
@@ -258,7 +253,7 @@ export default function ConfirmationScreen() {
         if (notifErr) console.error('[handleConfirm] notification error:', notifErr.message);
       }
 
-      Alert.alert('✅ Done!', 'Medication confirmed successfully!');
+      Alert.alert('Done!', 'Medication confirmed successfully!');
       fetchMedsForToday();
     } catch (err) {
       console.error('[handleConfirm] error:', err.message);
@@ -268,9 +263,9 @@ export default function ConfirmationScreen() {
     }
   };
 
-  // ────────────────────────────────────────────────────────────────────────
+ 
   // RENDER
-  // ────────────────────────────────────────────────────────────────────────
+
   if (pageLoading) {
     return (
       <View style={styles.loadingContainer}>

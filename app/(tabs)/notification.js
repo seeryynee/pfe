@@ -24,26 +24,23 @@ const getLocalDateString = () => {
   return `${y}-${m}-${d}`;
 };
 
-const getLocalISOString = () => {
-  const now = new Date();
-  const offset = now.getTimezoneOffset() * 60_000;
-  return new Date(now - offset).toISOString();
-};
+
 
  export default function NotificationScreen() {
   const [notification, setNotification] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('today');
   const router = useRouter();
-  const [patients, setPatients] = useState([]); // Liste de tous les patients
-  const [selectedId, setSelectedId] = useState(null); // ID du patient choisi
-  const [selectedName, setSelectedName] = useState(""); // Nom du patient choisi
+  const [patients, setPatients] = useState([]); 
+  const [selectedId, setSelectedId] = useState(null); 
+  const [selectedName, setSelectedName] = useState(""); 
+
     const initData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Charger les patients (pour voir Nasim !)
+
       const { data: patientsData } = await supabase
         .from('patients')
         .select('*')
@@ -60,7 +57,7 @@ const getLocalISOString = () => {
     }
   };
 
-  // ✅ 2. RAFRAÎCHISSEMENT AUTOMATIQUE QUAND ON ARRIVE SUR LA AGE
+  // RAFRAÎCHISSEMENT AUTOMATIQUE QUAND ON ARRIVE SUR LA PAGE OU ON REVIENT OU SELECEDID CHANGE
   useFocusEffect(
     useCallback(() => {
       initData(); 
@@ -68,7 +65,8 @@ const getLocalISOString = () => {
       if (selectedId) {
         checkMissedMedications();
       }
-      }, 30000); // 30 secondes
+      }, 30000); 
+      //pour ne pas refraicher manuellment pour voir les changment de notifications we use supabase realtime
       const notificationSubscription = supabase
         .channel('notification-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'notification' }, () => {
@@ -77,10 +75,11 @@ const getLocalISOString = () => {
         .subscribe();
 
       return () => {
+        //s'execute quand j quitte notification screen ou selectedid change ou app fermer
         clearInterval(interval);
         notificationSubscription.unsubscribe();
       };
-    }, [selectedId]) // Se relance si on change de patient
+    }, [selectedId]) 
   );
  
   const checkMissedMedications = async () => {
@@ -88,9 +87,9 @@ const getLocalISOString = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !selectedId) return;
 
-    const now = new Date();
-    const currentDate = getLocalDateString();
-    const currentTime = now.toTimeString().slice(0, 8);
+    const now = new Date();//objet Date complet
+    const currentDate = getLocalDateString();//recuperer que la date en string 
+    const currentTime = now.toTimeString().slice(0, 8);//recuperer l'heur avec timezone apres extraire que les 8 caracteres pour extraire que l'heur
 
     // Récupère tous les médicaments programmés aujourd'hui
     const { data: allTakes } = await supabase
@@ -114,10 +113,10 @@ const getLocalISOString = () => {
         
       let isProgrammedToday = false;
       if (scheduleType === 'consecutive') {
-        // Pour les médicaments consécutifs
-        const start = new Date(startDate);
+       
+        const start = new Date(startDate);//transforme start Date en objet Date
         const end = new Date(start);
-        end.setDate(end.getDate() + numOfDays - 1);
+        end.setDate(end.getDate() + numOfDays - 1);//retourner le jour de mois + num of dzys moins 1
         const today = new Date(currentDate);
       // Vérifie si aujourd'hui est entre start_date et start_date + num_of_days
         isProgrammedToday = today >= start && today <= end;
@@ -133,13 +132,13 @@ const getLocalISOString = () => {
         isProgrammedToday = scheduledToday && scheduledToday.length > 0;
       }
 
-      // ✅ Si PAS programmé aujourd'hui, passe au suivant
+      
       if (!isProgrammedToday) {
         continue;
       }
 
       
-      // Calcule la différence en minutes
+
       const [schedHour, schedMin] = scheduledTime.split(':').map(Number);
       const [nowHour, nowMin] = currentTime.split(':').map(Number);
       
@@ -161,7 +160,7 @@ const getLocalISOString = () => {
           .gte('taken_at', `${currentDate}T00:00:00`)
           .lte('taken_at', `${currentDate}T23:59:59`);
 
-        // Si pas pris → vérifie si notification déjà créée
+      
         if (!logs || logs.length === 0) {
           const { data: existingNotif } = await supabase
             .from('notification')
@@ -174,7 +173,7 @@ const getLocalISOString = () => {
            console.log("Notif exist");
            continue;
         }
-          // Si notification pas encore créée
+         
           if (!existingNotif || existingNotif.length === 0) {
              const { data: patientData } = await supabase
               .from('patients')
@@ -204,7 +203,7 @@ const getLocalISOString = () => {
                 console.log("notification created");
                 
              }
-              // ✅ Marque dans history comme "missed"
+
                   
               await supabase.from('history').insert({
                 patient_id: selectedId,
@@ -250,7 +249,7 @@ const getLocalISOString = () => {
   useEffect(() => {
      const init = async () => {
     
-    // 1. Charger les patients d'abord
+   
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase
@@ -269,12 +268,11 @@ const getLocalISOString = () => {
    useEffect(() => {
     if (selectedId) {
       console.log("Patient sélectionné :", selectedName);
-      fetchNotification();      // Recharge les notifications du patient choisi
+      fetchNotification();     
       checkMissedMedications();
       
     }
-  }, [selectedId]); // Se déclenche dès que selectedId change (clic sur la Chip)
-
+  }, [selectedId]); 
  const fetchNotification = async () => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -286,9 +284,9 @@ const getLocalISOString = () => {
   
     const { data, error } = await supabase
       .from('notification')
-      .select('*') // On prend tout simplement
+      .select('*') 
       .eq('caregiver_id', user.id)
-      .eq('patient_id', selectedId) // Filtre par patient
+      .eq('patient_id', selectedId) 
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -348,7 +346,7 @@ const getLocalISOString = () => {
 
   const makeCall = async (patientId) => {
   try {
-    // Récupère le numéro du PATIENT (pas du caregiver !)
+   
     const { data: patient, error } = await supabase
       .from('patients')
       .select('phone_number')
@@ -363,9 +361,11 @@ const getLocalISOString = () => {
     }
 
     const url = `tel:${patient.phone_number}`;
+    //verifier si l'appareil peut ouvrir ce lien
     const supported = await Linking.canOpenURL(url);
-    
+
     if (supported) {
+      //ouvre auto l'app avec le num
       await Linking.openURL(url);
     } else {
       Alert.alert('Error', 'Unable to open the phone dialer');
@@ -375,17 +375,20 @@ const getLocalISOString = () => {
     Alert.alert('Error', 'Failed to make call');
   }
 };
-
+//pour time created at tae notification 
   const formatTime = (timestamp) => {
+    //transfomer une date recuperer depuis DB qui en timestamp en objet date lisible
     const date = new Date(timestamp);
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     const ampm = date.getHours() >= 12 ? 'PM' : 'AM';
     return `${hours}:${minutes} ${ampm}`;
     };
-
-  const isToday = (timestamp) => {
+//cette fonction recoit param timestamp (date et heur) le transforme en date et le compare avec today date  pour verifier si notification a ete creer today ou non 
+ //pour separes les notif en 2 onglets 
+const isToday = (timestamp) => {
     const today = new Date();
+    //convertire le timrstamp tae notification on objet date 
     const date = new Date(timestamp);
     return (
       date.getDate() === today.getDate() &&
@@ -418,7 +421,7 @@ const getLocalISOString = () => {
         </View>
 
         
-        {/* ✅ BOUTON CALL : N'apparaît que si show_call_button est à true */}
+        
         {item.show_call_button && (
           <TouchableOpacity
             style={styles.callButton}
@@ -535,7 +538,7 @@ const getLocalISOString = () => {
         />
       </>
     )}
-    {/* --- FIN DE LA CONDITION --- */}
+    
   </View>
 );
 
